@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { IdentityProfileKindSchema, SampleStatusSchema } from './workflow';
 
-export const ConsentProfileStatusSchema = z.enum(['draft', 'active', 'revoked', 'deleted']);
+export const ConsentProfileStatusSchema = z.enum(['draft', 'active', 'revoked', 'deleting', 'deleted']);
 export type ConsentProfileStatus = z.infer<typeof ConsentProfileStatusSchema>;
 
 export const SELF_OWNED_CONSENT = {

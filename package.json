@@ -11,7 +11,7 @@
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "test": "pnpm -r --if-present run test && node supabase/tests/schema_static.test.mjs",
+    "test": "pnpm -r --if-present run test && node supabase/tests/schema_static.test.mjs && node supabase/tests/m2_static.test.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   }
 }

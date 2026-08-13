@@ -154,7 +154,7 @@ export function IdentityProfiles({ mode }: { mode: RuntimeMode }) {
         method: 'POST', body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
       });
       await refresh();
-      setMessage('Profile media and prepared upload paths were deleted before sensitive sample metadata was cleared.');
+      setMessage('Profile deletion completed after upload shutdown and private-media cleanup.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'DELETE_FAILED');
     } finally { setBusy(false); }
@@ -183,10 +183,10 @@ export function IdentityProfiles({ mode }: { mode: RuntimeMode }) {
           <div className={styles.profileHeader}><strong>{profile.displayName} · {profile.kind}</strong><span className={styles.status}>{profile.status}</span></div>
           {profile.samples.map(sample => <div className={styles.sample} key={sample.id}>Sample: <strong>{sample.status}</strong>{sample.rejectionCode ? ` · ${sample.rejectionCode}` : ''}</div>)}
           <div className={styles.actions}>
-            <label className={styles.secondary}>Add private sample<input hidden type="file" disabled={mock || busy || profile.status === 'revoked' || profile.status === 'deleted'} accept={profile.kind === 'voice' ? 'audio/*' : 'image/*,video/*'} onChange={event => void uploadSample(profile, event.target.files?.[0] ?? null)}/></label>
+            <label className={styles.secondary}>Add private sample<input hidden type="file" disabled={mock || busy || profile.status === 'revoked' || profile.status === 'deleting' || profile.status === 'deleted'} accept={profile.kind === 'voice' ? 'audio/*' : 'image/*,video/*'} onChange={event => void uploadSample(profile, event.target.files?.[0] ?? null)}/></label>
             <button className={styles.primary} disabled={busy || profile.status !== 'draft' || !profile.samples.some(sample => sample.status === 'validated')} onClick={() => void activate(profile)}>Activate validated profile</button>
-            <button className={styles.danger} disabled={busy || profile.status === 'revoked' || profile.status === 'deleted'} onClick={() => void revoke(profile)}>Revoke consent</button>
-            <button className={styles.danger} disabled={busy || profile.status === 'deleted'} onClick={() => void remove(profile)}>Delete profile</button>
+            <button className={styles.danger} disabled={busy || profile.status === 'revoked' || profile.status === 'deleting' || profile.status === 'deleted'} onClick={() => void revoke(profile)}>Revoke consent</button>
+            <button className={styles.danger} disabled={busy || profile.status === 'deleted'} onClick={() => void remove(profile)}>{profile.status === 'deleting' ? 'Retry deletion' : 'Delete profile'}</button>
           </div>
         </div>)}
       </article>

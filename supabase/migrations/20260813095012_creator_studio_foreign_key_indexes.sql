@@ -1,0 +1,12 @@
+create index creator_artifacts_created_by_idx on public.creator_artifacts(created_by) where created_by is not null;
+create index creator_artifacts_identity_profile_idx on public.creator_artifacts(identity_profile_id) where identity_profile_id is not null;
+create index creator_audit_actor_idx on public.creator_audit_events(actor_id) where actor_id is not null;
+create index creator_audit_artifact_idx on public.creator_audit_events(artifact_id) where artifact_id is not null;
+create index creator_audit_profile_idx on public.creator_audit_events(profile_id) where profile_id is not null;
+create index creator_samples_profile_idx on public.creator_identity_samples(profile_id);
+create index creator_jobs_input_artifact_idx on public.creator_jobs(input_artifact_id) where input_artifact_id is not null;
+create index creator_jobs_output_artifact_idx on public.creator_jobs(output_artifact_id) where output_artifact_id is not null;
+create index creator_reviews_project_idx on public.creator_reviews(project_id);
+create index creator_reviews_reviewer_idx on public.creator_reviews(reviewer_id);
+create index creator_rights_artifact_idx on public.creator_rights_attestations(artifact_id);
+create index creator_rights_project_idx on public.creator_rights_attestations(project_id);

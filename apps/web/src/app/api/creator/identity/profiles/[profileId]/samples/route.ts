@@ -1,39 +1,7 @@
 import { NextResponse } from 'next/server';
-import { ConfirmIdentityUploadInputSchema, IdentitySampleViewSchema } from '@creator/contracts';
-import { CreatorHttpError, creatorErrorResponse, readJsonBody, requireCreatorAuthority, throwForRpcError } from '../../../../../../../lib/server/authority';
-
-type RouteContext = Readonly<{ params: Promise<{ profileId: string }> }>;
-
-function serializeSample(record: Record<string, unknown>) {
-  return IdentitySampleViewSchema.parse({
-    id: record.id, profileId: record.profile_id, mimeType: record.mime_type ?? null,
-    byteLength: record.byte_length === null ? null : Number(record.byte_length), sha256: record.sha256 ?? null,
-    status: record.status, createdAt: record.created_at, validatedAt: record.validated_at ?? null,
-    rejectionCode: record.rejection_code ?? null, deletedAt: record.deleted_at ?? null,
-  });
-}
-
-export async function GET(_request: Request, context: RouteContext) {
-  try {
-    const { profileId } = await context.params;
-    const { client } = await requireCreatorAuthority();
-    const { data, error } = await client.from('creator_identity_samples').select('*').eq('profile_id', profileId).order('created_at', { ascending: false });
-    if (error) throwForRpcError(error);
-    return NextResponse.json({ samples: (data ?? []).map(record => serializeSample(record)) });
-  } catch (error) { return creatorErrorResponse(error); }
-}
-
-export async function POST(request: Request, context: RouteContext) {
-  try {
-    const { profileId } = await context.params;
-    const parsed = ConfirmIdentityUploadInputSchema.safeParse(await readJsonBody(request));
-    if (!parsed.success) throw new CreatorHttpError(400, 'VALIDATION_FAILED', 'Sample registration details are invalid.');
-    const { client } = await requireCreatorAuthority();
-    const { data, error } = await client.rpc('creator_register_identity_sample', {
-      p_profile_id: profileId, p_object_path: parsed.data.objectPath, p_mime_type: parsed.data.mimeType,
-      p_byte_length: parsed.data.byteLength, p_sha256: parsed.data.sha256, p_client_request_id: parsed.data.clientRequestId,
-    });
-    throwForRpcError(error);
-    return NextResponse.json({ sample: serializeSample(data as Record<string, unknown>) }, { status: 201 });
-  } catch (error) { return creatorErrorResponse(error); }
-}
+import { ConfirmIdentityUploadInputSchema,IdentitySampleViewSchema } from '@creator/contracts';
+import { CreatorHttpError,creatorErrorResponse,readJsonBody,requireCreatorAuthority,throwForRpcError } from '../../../../../../../lib/server/authority';
+type RouteContext=Readonly<{params:Promise<{profileId:string}>}>;
+function serializeSample(record:Record<string,unknown>){return IdentitySampleViewSchema.parse({id:record.id,profileId:record.profile_id,mimeType:record.mime_type??null,byteLength:record.byte_length===null?null:Number(record.byte_length),sha256:record.sha256??null,status:record.status,createdAt:record.created_at,validatedAt:record.validated_at??null,rejectionCode:record.rejection_code??null,deletedAt:record.deleted_at??null});}
+export async function GET(_request:Request,context:RouteContext){try{const {profileId}=await context.params;const {client}=await requireCreatorAuthority();const {data,error}=await client.from('creator_identity_samples').select('*').eq('profile_id',profileId).order('created_at',{ascending:false});if(error)throwForRpcError(error);return NextResponse.json({samples:(data??[]).map(record=>serializeSample(record))});}catch(error){return creatorErrorResponse(error);}}
+export async function POST(request:Request,context:RouteContext){try{const {profileId}=await context.params;const parsed=ConfirmIdentityUploadInputSchema.safeParse(await readJsonBody(request));if(!parsed.success)throw new CreatorHttpError(400,'VALIDATION_FAILED','Sample registration details are invalid.');const {client}=await requireCreatorAuthority();const {data,error}=await client.rpc('creator_register_identity_sample',{p_profile_id:profileId,p_client_request_id:parsed.data.clientRequestId});throwForRpcError(error);return NextResponse.json({sample:serializeSample(data as Record<string,unknown>)},{status:201});}catch(error){return creatorErrorResponse(error);}}

@@ -6,12 +6,18 @@ const combined=migrationNames.map(name=>readFileSync(new URL(name,migrationsDir)
 const workerGateName=migrationNames.find(name=>name.includes('script_worker_completion_gate'));
 const identityConcurrencyName=migrationNames.find(name=>name.includes('identity_intake_concurrency_completion'));
 const rightsConcurrencyName=migrationNames.find(name=>name.includes('rights_attestation_concurrency_completion'));
+const scriptLabelName=migrationNames.find(name=>name.includes('script_mock_labeling_completion'));
+const dropLegacyDeleteName=migrationNames.find(name=>name.includes('drop_legacy_delete_path'));
 assert.ok(workerGateName,'script worker completion migration must exist');
 assert.ok(identityConcurrencyName,'identity intake concurrency migration must exist');
 assert.ok(rightsConcurrencyName,'rights attestation concurrency migration must exist');
+assert.ok(scriptLabelName,'script mock labeling migration must exist');
+assert.ok(dropLegacyDeleteName,'legacy delete removal migration must exist');
 const workerGate=readFileSync(new URL(workerGateName,migrationsDir),'utf8');
 const identityConcurrency=readFileSync(new URL(identityConcurrencyName,migrationsDir),'utf8');
 const rightsConcurrency=readFileSync(new URL(rightsConcurrencyName,migrationsDir),'utf8');
+const scriptLabel=readFileSync(new URL(scriptLabelName,migrationsDir),'utf8');
+const dropLegacyDelete=readFileSync(new URL(dropLegacyDeleteName,migrationsDir),'utf8');
 assert.match(combined,/creator_private\.consent_statements/is,'consent must be bound to server-known evidence');
 assert.match(combined,/creator_private\.rights_statements/is,'content-rights statements must be governed server evidence');
 assert.match(combined,/42250e837adc94788c9a403c5e49362eac5c6914279ba74bfdc83c588bc2cb80/i,'content-rights digest must be governed');
@@ -35,7 +41,6 @@ assert.match(combined,/for key share/is,'Storage upload must lock the profile be
 assert.match(combined,/creator_begin_delete_consent_profile/is,'deletion must have a begin phase');
 assert.match(combined,/creator_finalize_delete_consent_profile/is,'deletion must have a finalize phase');
 assert.match(combined,/status = 'deleting'/is,'delete begin must tombstone the profile before media cleanup');
-assert.match(combined,/revoke all on function public\.creator_delete_consent_profile\(uuid,uuid\) from authenticated/is,'legacy one-phase delete must not be browser executable');
 assert.match(combined,/PRIVATE_MEDIA_DELETE_REQUIRED/is,'final deletion must fail closed while tracked media exists');
 assert.match(combined,/creator_private\.operation_claims/is,'destructive idempotency keys must be claimed before mutation');
 assert.match(combined,/creator_invalidate_profile_dependents/is,'revocation/deletion require full downstream invalidation');
@@ -57,5 +62,10 @@ assert.match(identityConcurrency,/creator_create_consent_profile_impl[\s\S]*on c
 assert.match(identityConcurrency,/creator_prepare_identity_upload_impl[\s\S]*for key share[\s\S]*on conflict \(owner_id, client_request_id\) do nothing/is,'upload preparation must lock the profile first and recover concurrent request conflicts');
 assert.match(identityConcurrency,/creator_register_identity_sample_impl[\s\S]*for key share[\s\S]*for update/is,'sample registration must lock the profile before the upload intent');
 assert.match(rightsConcurrency,/creator_attest_rights_impl[\s\S]*on conflict \(attested_by, client_request_id\) do nothing/is,'rights-attestation retries must recover concurrent unique conflicts');
+assert.match(scriptLabel,/\[SYNTHETIC MOCK DRAFT\]/,'mock script drafts must have a visible synthetic label');
+assert.match(scriptLabel,/'provider','mock'/is,'mock script drafts must record provider=mock');
+assert.match(scriptLabel,/'generation_mode','synthetic_mock'/is,'mock script drafts must be structurally labelled synthetic');
+assert.match(dropLegacyDelete,/drop function if exists public\.creator_delete_consent_profile\(uuid,uuid\)/is,'legacy public one-phase delete must be removed');
+assert.match(dropLegacyDelete,/drop function if exists creator_private\.creator_delete_consent_profile_impl\(uuid,uuid\)/is,'legacy private one-phase delete must be removed');
 assert.doesNotMatch(combined,/getPublicUrl/i,'M2 must not introduce public media URLs');
 console.log('M2 consent/storage/workflow authority static guardrails: PASS');

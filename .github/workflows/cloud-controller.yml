@@ -1,9 +1,115 @@
 name: Cloud Controller
+
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - milestone/m3b1-voice-runtime-readiness
+    paths:
+      - '.controller/requests/*.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: creator-studio-cloud-controller
+  cancel-in-progress: false
+
 jobs:
-  verify:
+  apply-request:
+    if: github.actor == 'APReddy-AutoBotz'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - run: echo "controller-ready"
+        with:
+          fetch-depth: 2
+
+      - name: Locate controller request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          request="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^\.controller/requests/[A-Za-z0-9._-]+\.json$' | tail -n 1)"
+          test -n "$request"
+          echo "path=$request" >> "$GITHUB_OUTPUT"
+
+      - name: Validate and materialize request
+        env:
+          REQUEST_PATH: ${{ steps.request.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          request_path = pathlib.Path(os.environ['REQUEST_PATH'])
+          data = json.loads(request_path.read_text(encoding='utf-8'))
+          if data.get('version') != 1:
+              raise SystemExit('unsupported controller request version')
+
+          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
+          if data.get('base_sha') != parent:
+              raise SystemExit('controller request base SHA mismatch')
+
+          message = data.get('commit_message')
+          if not isinstance(message, str) or not re.fullmatch(r'[A-Za-z0-9 ._():/\-]{1,100}', message):
+              raise SystemExit('invalid controller commit message')
+
+          files = data.get('files')
+          deletions = data.get('deletions', [])
+          if not isinstance(files, list) or not files or len(files) > 50:
+              raise SystemExit('controller request must contain 1-50 files')
+          if not isinstance(deletions, list) or len(deletions) > 50:
+              raise SystemExit('invalid deletion list')
+
+          allowed = re.compile(r'^(apps/web/|packages/contracts/|services/render-worker/|supabase/migrations/|supabase/tests/|docs/|tasks/|package\.json$|pnpm-workspace\.yaml$)')
+          forbidden_media = re.compile(r'\.(wav|mp3|m4a|mp4|mov|webm|png|jpg|jpeg|webp)$', re.I)
+
+          changed = []
+          for item in files:
+              if not isinstance(item, dict) or set(item) != {'path', 'content_base64'}:
+                  raise SystemExit('invalid file entry')
+              path = item['path']
+              if not isinstance(path, str) or not allowed.match(path) or '..' in pathlib.PurePosixPath(path).parts or forbidden_media.search(path):
+                  raise SystemExit(f'forbidden controller path: {path!r}')
+              encoded = item['content_base64']
+              if not isinstance(encoded, str) or len(encoded) > 1_000_000:
+                  raise SystemExit('invalid file payload')
+              raw = base64.b64decode(encoded, validate=True)
+              if len(raw) > 700_000:
+                  raise SystemExit('file payload too large')
+              raw.decode('utf-8')
+              target = pathlib.Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+              changed.append(path)
+
+          for path in deletions:
+              if not isinstance(path, str) or not allowed.match(path) or '..' in pathlib.PurePosixPath(path).parts:
+                  raise SystemExit(f'forbidden deletion path: {path!r}')
+              target = pathlib.Path(path)
+              if target.exists():
+                  target.unlink()
+              changed.append(path)
+
+          pathlib.Path('.controller-changed.txt').write_text('\n'.join(changed) + '\n', encoding='utf-8')
+          pathlib.Path('.controller-message.txt').write_text(message + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit validated source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            git add -A -- "$path"
+          done < .controller-changed.txt
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git config user.name 'creator-studio-controller[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -F .controller-message.txt
+          git push origin "HEAD:${GITHUB_REF_NAME}"

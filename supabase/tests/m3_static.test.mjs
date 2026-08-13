@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 const authority = readFileSync(new URL('../migrations/20260813124538_m3_voice_phase_a_authority.sql', import.meta.url), 'utf8');
 const constraints = readFileSync(new URL('../migrations/20260813124552_m3_voice_phase_a_constraints.sql', import.meta.url), 'utf8');
 const replayHardening = readFileSync(new URL('../migrations/20260813125246_m3_voice_replay_owner_scope_hardening.sql', import.meta.url), 'utf8');
+const leaseRecovery = readFileSync(new URL('../migrations/20260813130232_m3_mock_voice_lease_recovery.sql', import.meta.url), 'utf8');
+const finalConcurrency = readFileSync(new URL('../migrations/20260813150724_m3_final_review_concurrency_closure.sql', import.meta.url), 'utf8');
 const voiceContracts = readFileSync(new URL('../../packages/contracts/src/voice.ts', import.meta.url), 'utf8');
 const workerVoice = readFileSync(new URL('../../services/render-worker/src/creator_worker/voice.py', import.meta.url), 'utf8');
 
@@ -35,11 +37,23 @@ assert.match(replayHardening,/creator_audit_events[\s\S]*owner_id = v_actor[\s\S
 assert.match(replayHardening,/project_id=p_project_id and idempotency_key=p_idempotency_key and requested_by=v_actor/is,'concurrent job replay recovery must stay owner scoped');
 
 assert.match(authority,/creator_claim_mock_voice_job_impl/is,'M3 requires a trusted worker claim boundary');
-assert.match(authority,/select \* into v_profile[\s\S]*for key share[\s\S]*select \* into v_project[\s\S]*for update[\s\S]*select \* into v_job[\s\S]*for update/is,'worker claim lock order must be profile -> project -> job');
 assert.match(authority,/revoke all on function public\.creator_claim_mock_voice_job\(uuid,integer\) from public, anon, authenticated/is,'browser roles cannot claim voice jobs');
 assert.match(authority,/grant execute on function public\.creator_claim_mock_voice_job\(uuid,integer\) to service_role/is,'only service_role can claim mock voice jobs');
-assert.doesNotMatch(authority,/update public\.creator_projects set current_stage='VOICE_GENERATING'/i,'Phase A must not expose a real voice workflow transition');
-assert.doesNotMatch(authority,/insert into public\.creator_artifacts[\s\S]*kind[^;]*'voice'/i,'Phase A claim must not create a real voice artifact');
+assert.match(leaseRecovery,/select \* into v_profile[\s\S]*for key share[\s\S]*select \* into v_project[\s\S]*for update[\s\S]*select \* into v_job[\s\S]*for update/is,'worker claim and lease recovery lock order must stay profile -> project -> job');
+assert.match(leaseRecovery,/v_job\.status = 'queued'[\s\S]*v_job\.status = 'leased' and v_job\.leased_until is not null and v_job\.leased_until <= now\(\)/is,'worker must allow queued claims and expired-lease recovery only');
+assert.match(leaseRecovery,/raise exception 'VOICE_JOB_NOT_CLAIMABLE'/is,'active/nonrecoverable leases must fail closed');
+assert.match(leaseRecovery,/reclaimed_expired_lease',v_reclaimed/is,'lease recovery must be audit-labelled');
+assert.match(leaseRecovery,/attempt_count=attempt_count\+1/is,'lease recovery must increment the worker attempt counter');
+assert.doesNotMatch(leaseRecovery,/update public\.creator_projects set current_stage=/i,'lease recovery must not advance workflow state');
+assert.doesNotMatch(leaseRecovery,/insert into public\.creator_artifacts/is,'lease recovery must not create a voice artifact');
+
+assert.match(finalConcurrency,/voice_provider_catalog[\s\S]*for share/is,'request/claim provider authority must be row locked');
+assert.match(finalConcurrency,/voice_runtime_policy[\s\S]*for share/is,'runtime kill-switch authority must be row locked');
+assert.match(finalConcurrency,/on conflict do nothing[\s\S]*returning \* into v_audit[\s\S]*if found[\s\S]*'replayed',false[\s\S]*'replayed',true/is,'denial conflict recovery must distinguish a new denial from an exact replay');
+assert.match(finalConcurrency,/requested_by = v_actor/is,'final request replay must remain owner scoped');
+assert.match(finalConcurrency,/v_job\.status = 'leased'[\s\S]*v_job\.leased_until is not null[\s\S]*v_job\.leased_until <= now\(\)/is,'final worker claim must retain expired-lease recovery');
+assert.doesNotMatch(finalConcurrency,/update public\.creator_projects set current_stage=/i,'final concurrency closure must not advance workflow state');
+assert.doesNotMatch(finalConcurrency,/insert into public\.creator_artifacts/is,'final concurrency closure must not create media artifacts');
 
 assert.match(voiceContracts,/\[SYNTHETIC MOCK VOICE DRAFT\]/,'TypeScript mock output must be visibly synthetic');
 assert.match(voiceContracts,/mediaCreated: z\.literal\(false\)/,'TypeScript mock adapter must not create media');

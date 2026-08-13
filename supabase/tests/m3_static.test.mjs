@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const authority = readFileSync(new URL('../migrations/20260813124538_m3_voice_phase_a_authority.sql', import.meta.url), 'utf8');
 const constraints = readFileSync(new URL('../migrations/20260813124552_m3_voice_phase_a_constraints.sql', import.meta.url), 'utf8');
+const replayHardening = readFileSync(new URL('../migrations/20260813125246_m3_voice_replay_owner_scope_hardening.sql', import.meta.url), 'utf8');
 const voiceContracts = readFileSync(new URL('../../packages/contracts/src/voice.ts', import.meta.url), 'utf8');
 const workerVoice = readFileSync(new URL('../../services/render-worker/src/creator_worker/voice.py', import.meta.url), 'utf8');
 
@@ -29,6 +30,9 @@ assert.match(authority,/MOCK_PROVIDER_MUST_BE_ZERO_COST/is,'Phase A mock jobs mu
 assert.match(authority,/on conflict \(project_id,idempotency_key\) do nothing/is,'voice job creation must recover concurrent exact retries');
 assert.match(authority,/request_fingerprint/is,'voice job replay must bind exact request authority');
 assert.match(constraints,/voice_sample_ids is not null.*cardinality\(voice_sample_ids\) > 0/is,'voice jobs must bind at least one sample id');
+assert.match(replayHardening,/creator_jobs[\s\S]*requested_by = v_actor/is,'existing voice-job replay must be scoped to the authenticated owner');
+assert.match(replayHardening,/creator_audit_events[\s\S]*owner_id = v_actor[\s\S]*idempotency_key = p_idempotency_key/is,'denied-audit replay must be scoped to the authenticated owner');
+assert.match(replayHardening,/project_id=p_project_id and idempotency_key=p_idempotency_key and requested_by=v_actor/is,'concurrent job replay recovery must stay owner scoped');
 
 assert.match(authority,/creator_claim_mock_voice_job_impl/is,'M3 requires a trusted worker claim boundary');
 assert.match(authority,/select \* into v_profile[\s\S]*for key share[\s\S]*select \* into v_project[\s\S]*for update[\s\S]*select \* into v_job[\s\S]*for update/is,'worker claim lock order must be profile -> project -> job');

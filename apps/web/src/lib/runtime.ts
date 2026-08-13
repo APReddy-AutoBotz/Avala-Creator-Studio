@@ -1,11 +1,6 @@
 export type RuntimeMode = 'demo' | 'test' | 'preview' | 'production';
 
-type CreatorEnvironment = Readonly<Partial<Record<
-  | 'CREATOR_RUNTIME_MODE'
-  | 'NEXT_PUBLIC_SUPABASE_URL'
-  | 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  string | undefined
->>>;
+type CreatorEnvironment = Readonly<Record<string, string | undefined>>;
 
 export function runtimeMode(environment: CreatorEnvironment = process.env): RuntimeMode {
   const mode = environment.CREATOR_RUNTIME_MODE ?? 'production';

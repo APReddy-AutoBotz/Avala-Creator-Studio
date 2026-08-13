@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 const migrationsDir=new URL('../migrations/',import.meta.url);
-const combined=readdirSync(migrationsDir).filter(name=>name.endsWith('.sql')).sort().map(name=>readFileSync(new URL(name,migrationsDir),'utf8')).join('\n');
+const migrationNames=readdirSync(migrationsDir).filter(name=>name.endsWith('.sql')).sort();
+const combined=migrationNames.map(name=>readFileSync(new URL(name,migrationsDir),'utf8')).join('\n');
+const workerGateName=migrationNames.find(name=>name.includes('script_worker_completion_gate'));
+assert.ok(workerGateName,'script worker completion migration must exist');
+const workerGate=readFileSync(new URL(workerGateName,migrationsDir),'utf8');
 assert.match(combined,/creator_private\.consent_statements/is,'consent must be bound to server-known evidence');
 assert.match(combined,/creator_private\.rights_statements/is,'content-rights statements must be governed server evidence');
 assert.match(combined,/42250e837adc94788c9a403c5e49362eac5c6914279ba74bfdc83c588bc2cb80/i,'content-rights digest must be governed');
@@ -35,5 +39,13 @@ assert.match(combined,/job_type in \('voice','avatar','edit','final'\)/is,'voice
 assert.match(combined,/then 'SCRIPT_APPROVED'/is,'voice revocation must rewind project stage');
 assert.match(combined,/then 'VOICE_APPROVED'/is,'avatar revocation must rewind project stage');
 assert.match(combined,/object_path=null.*sha256=null/is,'deletion must clear sensitive sample metadata');
+assert.match(workerGate,/creator_record_script_draft/is,'M2 must provide a trusted SCRIPT_READY completion path');
+assert.match(workerGate,/revoke all on function public\.creator_record_script_draft\(uuid,text,text,uuid\) from public, anon, authenticated/is,'browser roles must not complete script generation');
+assert.match(workerGate,/grant execute on function public\.creator_record_script_draft\(uuid,text,text,uuid\) to service_role/is,'trusted worker role must be able to complete script generation');
+assert.match(workerGate,/'SCRIPT_READY'[\s\S]*'SCRIPT_REVIEW'/is,'trusted completion must move script generation to human review');
+assert.doesNotMatch(workerGate,/\('SCRIPT_APPROVED','START_VOICE'/i,'M2 must not expose START_VOICE before a trusted voice-ready path exists');
+assert.doesNotMatch(workerGate,/\('VOICE_APPROVED','START_AVATAR'/i,'M2 must not expose START_AVATAR before a trusted avatar-ready path exists');
+assert.doesNotMatch(workerGate,/\('AVATAR_APPROVED','START_EDIT'/i,'M2 must not expose START_EDIT before a trusted edit-ready path exists');
+assert.doesNotMatch(workerGate,/\('EDIT_APPROVED','START_FINAL'/i,'M2 must not expose START_FINAL before a trusted final-ready path exists');
 assert.doesNotMatch(combined,/getPublicUrl/i,'M2 must not introduce public media URLs');
 console.log('M2 consent/storage/workflow authority static guardrails: PASS');

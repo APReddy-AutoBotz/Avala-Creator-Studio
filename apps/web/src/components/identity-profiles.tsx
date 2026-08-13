@@ -38,7 +38,6 @@ export function IdentityProfiles({ mode }: { mode: RuntimeMode }) {
   useEffect(() => {
     if (mock) return;
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mock]);
 
   async function refresh() {

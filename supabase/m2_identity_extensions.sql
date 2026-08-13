@@ -1,0 +1,2 @@
+-- Superseded by the tracked migrations in supabase/migrations/.
+-- Kept only as a pointer for links from the original M2 review history.

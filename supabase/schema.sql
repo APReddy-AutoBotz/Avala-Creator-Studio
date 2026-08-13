@@ -1,0 +1,5 @@
+-- Canonical executable schema lives in supabase/migrations/.
+--
+-- This file intentionally contains no duplicate DDL. The previous reference-only schema
+-- drifted from the hardened live database and was retired after the M2 Codex review.
+-- Apply and inspect the timestamped migration files instead.

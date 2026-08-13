@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 11 fails closed on unreviewed dependency build scripts. These two are
+# explicitly reviewed/required by the current toolchain; everything else remains denied.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

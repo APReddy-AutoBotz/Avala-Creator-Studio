@@ -58,8 +58,10 @@ jobs:
             echo 'Publishing integration is outside product scope.' >&2
             exit 1
           fi
+          # Role names such as PostgreSQL service_role are legitimate schema text. Detect
+          # actual secret material / populated privileged-key assignments instead.
           if grep -RniE --exclude-dir=.git --exclude='ci.yml' --exclude='.env.example' --exclude='*.md' \
-            '(service[_-]?role|sk-proj-|sb_secret_|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' .; then
+            '(sk-proj-|sb_secret_|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=[[:space:]]*[A-Za-z0-9._-]{20,})' .; then
             echo 'Potential privileged credential committed.' >&2
             exit 1
           fi

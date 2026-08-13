@@ -31,17 +31,9 @@ export const TRANSITION_RULES: readonly Rule[] = [
   { from:'CONTENT_APPROVED',event:'START_SCRIPT',to:'SCRIPT_GENERATING',actor:'human' },
   { from:'SCRIPT_GENERATING',event:'SCRIPT_READY',to:'SCRIPT_REVIEW',actor:'worker' },
   { from:'SCRIPT_REVIEW',event:'APPROVE_SCRIPT',to:'SCRIPT_APPROVED',actor:'human' },
-  { from:'SCRIPT_APPROVED',event:'START_VOICE',to:'VOICE_GENERATING',actor:'human' },
-  { from:'VOICE_GENERATING',event:'VOICE_READY',to:'VOICE_REVIEW',actor:'worker' },
   { from:'VOICE_REVIEW',event:'APPROVE_VOICE',to:'VOICE_APPROVED',actor:'human' },
-  { from:'VOICE_APPROVED',event:'START_AVATAR',to:'AVATAR_GENERATING',actor:'human' },
-  { from:'AVATAR_GENERATING',event:'AVATAR_READY',to:'AVATAR_REVIEW',actor:'worker' },
   { from:'AVATAR_REVIEW',event:'APPROVE_AVATAR',to:'AVATAR_APPROVED',actor:'human' },
-  { from:'AVATAR_APPROVED',event:'START_EDIT',to:'EDIT_GENERATING',actor:'human' },
-  { from:'EDIT_GENERATING',event:'EDIT_READY',to:'EDIT_REVIEW',actor:'worker' },
   { from:'EDIT_REVIEW',event:'APPROVE_EDIT',to:'EDIT_APPROVED',actor:'human' },
-  { from:'EDIT_APPROVED',event:'START_FINAL',to:'FINAL_RENDERING',actor:'human' },
-  { from:'FINAL_RENDERING',event:'FINAL_READY',to:'FINAL_REVIEW',actor:'worker' },
   { from:'FINAL_REVIEW',event:'APPROVE_FINAL',to:'FINAL_APPROVED',actor:'human' }
 ] as const;
 export class InvalidWorkflowTransition extends Error { readonly code='INVALID_WORKFLOW_TRANSITION'; constructor(){ super('The requested workflow transition is not allowed.'); } }
@@ -67,5 +59,5 @@ export const CreateConsentProfileInputSchema=z.object({kind:IdentityProfileKindS
 export const RegisterIdentitySampleInputSchema=z.object({profileId:z.string().uuid(),clientRequestId:z.string().uuid()}).strict();
 export const RevokeConsentProfileInputSchema=z.object({reason:z.string().trim().min(1).max(1000),idempotencyKey:z.string().uuid()}).strict();
 export const DeleteConsentProfileInputSchema=z.object({idempotencyKey:z.string().uuid()}).strict();
-export type ConsentEligibility=Readonly<{status:'draft'|'active'|'revoked'|'deleted';revoked:boolean;samples:readonly Readonly<{status:SampleStatus}>[]}>;
+export type ConsentEligibility=Readonly<{status:'draft'|'active'|'revoked'|'deleting'|'deleted';revoked:boolean;samples:readonly Readonly<{status:SampleStatus}>[]}>;
 export function isIdentityProfileGenerationEligible(input:ConsentEligibility):boolean { return input.status==='active'&&!input.revoked&&input.samples.some(s=>s.status==='validated'); }

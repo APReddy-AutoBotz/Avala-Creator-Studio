@@ -20,6 +20,11 @@ export const IdentityProfileKindSchema = z.enum(['voice','avatar']);
 export type IdentityProfileKind = z.infer<typeof IdentityProfileKindSchema>;
 export const SampleStatusSchema = z.enum(['pending_validation','validated','rejected','deleted']);
 export type SampleStatus = z.infer<typeof SampleStatusSchema>;
+export const CONTENT_RIGHTS_STATEMENT = {
+  version: 'content-rights-v1',
+  text: 'I own this content or have permission to adapt it into a video.',
+  sha256: '42250e837adc94788c9a403c5e49362eac5c6914279ba74bfdc83c588bc2cb80',
+} as const;
 type Rule = Readonly<{ from: WorkflowStage; event: WorkflowEvent; to: WorkflowStage; actor: ActorKind }>;
 export const TRANSITION_RULES: readonly Rule[] = [
   { from:'CONTENT_REVIEW',event:'APPROVE_CONTENT',to:'CONTENT_APPROVED',actor:'human' },

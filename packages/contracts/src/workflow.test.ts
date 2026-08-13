@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { approvalMatchesArtifact,CreateConsentProfileInputSchema,InvalidWorkflowTransition,invalidateDownstream,isIdentityProfileGenerationEligible,RegisterIdentitySampleInputSchema,transitionStage } from './workflow';
+import { approvalMatchesArtifact,CONTENT_RIGHTS_STATEMENT,CreateConsentProfileInputSchema,InvalidWorkflowTransition,invalidateDownstream,isIdentityProfileGenerationEligible,RegisterIdentitySampleInputSchema,transitionStage } from './workflow';
 
 describe('human-gated workflow',()=>{
   it('allows human content approval but not worker approval',()=>{ expect(transitionStage('CONTENT_REVIEW','APPROVE_CONTENT','human')).toBe('CONTENT_APPROVED'); expect(()=>transitionStage('CONTENT_REVIEW','APPROVE_CONTENT','worker')).toThrow(InvalidWorkflowTransition); });
   it('prevents stage skipping',()=>{ expect(()=>transitionStage('CONTENT_REVIEW','START_VOICE','human')).toThrow(InvalidWorkflowTransition); });
   it('requires worker authority for generated draft readiness',()=>{ expect(()=>transitionStage('SCRIPT_GENERATING','SCRIPT_READY','human')).toThrow(InvalidWorkflowTransition); expect(transitionStage('SCRIPT_GENERATING','SCRIPT_READY','worker')).toBe('SCRIPT_REVIEW'); });
+  it('pins governed content-rights evidence',()=>{expect(CONTENT_RIGHTS_STATEMENT.version).toBe('content-rights-v1');expect(CONTENT_RIGHTS_STATEMENT.sha256).toBe('42250e837adc94788c9a403c5e49362eac5c6914279ba74bfdc83c588bc2cb80');});
 });
 describe('immutable approval bindings',()=>{
  const approval={artifactId:'11111111-1111-1111-8111-111111111111',artifactVersion:1,sha256:'a'.repeat(64),reviewerId:'22222222-2222-4222-8222-222222222222',reviewedAt:'2026-08-13T00:00:00.000Z',decision:'approved' as const};

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfirmIdentityUploadInputSchema, PrepareIdentityUploadInputSchema, SELF_OWNED_CONSENT } from './identity';
+import { ConfirmIdentityUploadInputSchema, ConsentProfileStatusSchema, PrepareIdentityUploadInputSchema, SELF_OWNED_CONSENT } from './identity';
 
 describe('identity upload contracts', () => {
   it('rejects nested/path-traversal filenames', () => {
@@ -16,5 +16,8 @@ describe('identity upload contracts', () => {
     expect(SELF_OWNED_CONSENT.voice.version).toBe('self-owned-v1');
     expect(SELF_OWNED_CONSENT.voice.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(SELF_OWNED_CONSENT.avatar.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it('represents the two-phase deletion tombstone state',()=>{
+    expect(ConsentProfileStatusSchema.parse('deleting')).toBe('deleting');
   });
 });

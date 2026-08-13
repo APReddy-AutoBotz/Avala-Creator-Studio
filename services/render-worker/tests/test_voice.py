@@ -1,3 +1,7 @@
+import hashlib
+import io
+import wave
+
 import pytest
 
 from creator_worker.voice import (
@@ -5,6 +9,7 @@ from creator_worker.voice import (
     MockVoiceRequest,
     VoiceExecutionBlocked,
     VoiceExecutionContext,
+    create_synthetic_wav_fixture,
 )
 
 
@@ -76,3 +81,27 @@ def test_budget_missing_or_exceeded_blocks_execution() -> None:
         )
     with pytest.raises(VoiceExecutionBlocked, match="PROVIDER_EXECUTION_DISABLED"):
         DeterministicMockVoiceAdapter().create_draft(request=request(), context=context(execution_enabled=False))
+
+
+def test_synthetic_wav_fixture_is_deterministic_valid_and_non_speech() -> None:
+    first = create_synthetic_wav_fixture(job_id="11111111-1111-4111-8111-111111111111")
+    second = create_synthetic_wav_fixture(job_id="11111111-1111-4111-8111-111111111111")
+    other = create_synthetic_wav_fixture(job_id="22222222-2222-4222-8222-222222222222")
+    assert first == second
+    assert first.sha256 != other.sha256
+    assert first.label == "[SYNTHETIC MOCK VOICE DRAFT]"
+    assert first.mime_type == "audio/wav"
+    assert first.sha256 == hashlib.sha256(first.audio_bytes).hexdigest()
+    assert first.byte_length == len(first.audio_bytes)
+    assert first.byte_length < 25_000_000
+
+    with wave.open(io.BytesIO(first.audio_bytes), "rb") as wav:
+        assert wav.getnchannels() == 1
+        assert wav.getsampwidth() == 2
+        assert wav.getframerate() == 16_000
+        assert wav.getnframes() > 0
+
+
+def test_synthetic_wav_fixture_rejects_unbounded_duration() -> None:
+    with pytest.raises(VoiceExecutionBlocked, match="VOICE_FIXTURE_DURATION_INVALID"):
+        create_synthetic_wav_fixture(job_id="job", duration_ms=10)

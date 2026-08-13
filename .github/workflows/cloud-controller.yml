@@ -1,0 +1,9 @@
+name: Cloud Controller
+on:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: echo "controller-ready"

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const authority = readFileSync(new URL('../migrations/20260813130000_m3_voice_phase_a_authority.sql', import.meta.url), 'utf8');
-const constraints = readFileSync(new URL('../migrations/20260813130001_m3_voice_phase_a_constraints.sql', import.meta.url), 'utf8');
+const authority = readFileSync(new URL('../migrations/20260813124538_m3_voice_phase_a_authority.sql', import.meta.url), 'utf8');
+const constraints = readFileSync(new URL('../migrations/20260813124552_m3_voice_phase_a_constraints.sql', import.meta.url), 'utf8');
 const voiceContracts = readFileSync(new URL('../../packages/contracts/src/voice.ts', import.meta.url), 'utf8');
 const workerVoice = readFileSync(new URL('../../services/render-worker/src/creator_worker/voice.py', import.meta.url), 'utf8');
 

@@ -53,12 +53,12 @@ jobs:
       - name: Reject publishing integrations, media, and credential patterns
         shell: bash
         run: |
-          if grep -RniE --exclude-dir=.git --exclude='*.md' --exclude='README.md' \
+          if grep -RniE --exclude-dir=.git --exclude='ci.yml' --exclude='*.md' --exclude='README.md' \
             'youtube|instagram|facebook|tiktok|linkedin|social[ _-]?oauth' .; then
             echo 'Publishing integration is outside product scope.' >&2
             exit 1
           fi
-          if grep -RniE --exclude-dir=.git --exclude='.env.example' --exclude='*.md' \
+          if grep -RniE --exclude-dir=.git --exclude='ci.yml' --exclude='.env.example' --exclude='*.md' \
             '(service[_-]?role|sk-proj-|sb_secret_|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' .; then
             echo 'Potential privileged credential committed.' >&2
             exit 1

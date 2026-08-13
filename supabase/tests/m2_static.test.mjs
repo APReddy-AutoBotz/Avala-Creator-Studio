@@ -8,10 +8,14 @@ assert.match(combined,/42250e837adc94788c9a403c5e49362eac5c6914279ba74bfdc83c588
 assert.match(combined,/extensions\.digest/is,'artifact authority must recompute text digests');
 assert.match(combined,/ARTIFACT_DIGEST_MISMATCH/is,'mismatched caller digest must fail closed');
 assert.match(combined,/creator_private\.transition_claims/is,'transition idempotency must bind to exact operation payload');
+assert.match(combined,/v_project\.title <> v_title/is,'project request replay must bind to exact title');
+assert.match(combined,/v_existing\.details->>'target_kind'.*p_target_kind/is,'revision replay must bind to target kind');
+assert.match(combined,/v_existing\.details->>'reason'.*v_reason/is,'revision/revoke replay must bind to exact reason');
 assert.match(combined,/IDEMPOTENCY_KEY_REUSED/is,'conflicting replay must be rejected');
 assert.match(combined,/creator_upload_intents/is,'prepared uploads must be tracked');
 assert.match(combined,/creator_prepare_identity_upload/is,'server-authoritative upload preparation must exist');
 assert.match(combined,/UPLOAD_INTENT_REQUIRED/is,'registration must bind to a prepared intent');
+assert.match(combined,/UPLOAD_INTENT_EXPIRED/is,'expired intents must fail registration');
 assert.match(combined,/PRIVATE_OBJECT_NOT_FOUND/is,'physical object must exist before registration or validation');
 assert.match(combined,/status='prepared'.*expires_at>now\(\)/is,'Storage insert must require a live prepared intent');
 assert.match(combined,/p\.status in \('draft','active'\).*p\.revoked_at is null.*p\.deleted_at is null/is,'Storage insert must require current consent profile');

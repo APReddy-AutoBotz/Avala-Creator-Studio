@@ -1,0 +1,17 @@
+{
+  "name": "avala-creator-studio",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.0.9",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @creator/web dev",
+    "build": "pnpm -r --if-present run build",
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test && node supabase/tests/schema_static.test.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  }
+}

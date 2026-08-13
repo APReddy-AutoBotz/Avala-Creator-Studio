@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:30'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      creator-web:
+        patterns:
+          - '*'
+
+  - package-ecosystem: pip
+    directory: /services/render-worker
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:45'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      creator-worker:
+        patterns:
+          - '*'

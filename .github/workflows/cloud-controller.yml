@@ -108,10 +108,12 @@ jobs:
               with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode='r:gz') as bundle:
                   members = bundle.getmembers()
                   if not members or len(members) > 50:
-                      raise SystemExit('archive must contain 1-50 files')
+                      raise SystemExit('archive must contain 1-50 entries')
                   for member in members:
+                      if member.isdir():
+                          continue
                       if not member.isfile():
-                          raise SystemExit('archive may contain regular files only')
+                          raise SystemExit('archive may contain regular files and directories only')
                       validate_path(member.name)
                       if member.size > 700_000:
                           raise SystemExit('archive member too large')
@@ -136,6 +138,8 @@ jobs:
 
           if len(changed) != len(set(changed)):
               raise SystemExit('duplicate controller target')
+          if not changed:
+              raise SystemExit('controller request produced no file changes')
           pathlib.Path('.controller-changed.txt').write_text('\n'.join(changed) + '\n', encoding='utf-8')
           pathlib.Path('.controller-message.txt').write_text(message + '\n', encoding='utf-8')
           PY

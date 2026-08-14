@@ -6,13 +6,19 @@ from uuid import UUID
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from .b1_runtime import B1WorkerError, SupabaseB1Client, run_media_deletion, run_mock_voice_job
+from .b1_runtime import (
+    B1WorkerError,
+    SupabaseB1Client,
+    reconcile_held_voice_output,
+    run_media_deletion,
+    run_mock_voice_job,
+)
 from .providers import ArtifactKind, MockGenerationProvider
 
 RuntimeMode = Literal["demo", "test", "preview", "production"]
 ProviderMode = Literal["mock", "real"]
 
-app = FastAPI(title="Avala Creator Render Worker", version="0.2.0")
+app = FastAPI(title="Avala Creator Render Worker", version="0.2.1")
 
 
 class ExecuteJobRequest(BaseModel):
@@ -117,6 +123,20 @@ def run_b1_voice_job(
     except B1WorkerError as error:
         raise b1_worker_error(error) from None
     return {**result, "warning": "synthetic_mock: deterministic non-speech WAV only"}
+
+
+@app.post("/v1/voice/jobs/{job_id}/reconcile-output")
+def reconcile_b1_voice_output(
+    job_id: UUID,
+    x_worker_token: str | None = Header(default=None),
+) -> dict[str, object]:
+    authorize_worker(x_worker_token)
+    require_b1_mock_runtime()
+    try:
+        result = reconcile_held_voice_output(SupabaseB1Client.from_environment(), str(job_id))
+    except B1WorkerError as error:
+        raise b1_worker_error(error) from None
+    return {**result, "warning": "synthetic_mock: output-ledger reconciliation only"}
 
 
 @app.post("/v1/media-deletions/{deletion_id}/run")

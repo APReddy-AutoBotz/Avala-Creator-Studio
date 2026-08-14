@@ -66,6 +66,47 @@ def _voice_object_path(job: dict[str, Any], output_sha256: str) -> str:
     return f"{owner_id}/{project_id}/{job_id}/{output_sha256}.wav"
 
 
+def _committed_completion(
+    client: B1AuthorityClient,
+    job_id: str,
+    output_sha256: str,
+    object_path: str,
+) -> dict[str, Any] | None:
+    current = client.get_voice_job(job_id)
+    if current is None:
+        return None
+    if current.get("status") == "succeeded" and current.get("output_artifact_id"):
+        return {
+            "status": "succeeded",
+            "job_id": job_id,
+            "artifact_id": current["output_artifact_id"],
+            "replayed": True,
+            "output_sha256": output_sha256,
+            "object_path": object_path,
+            "media_kind": "synthetic_mock",
+        }
+    return None
+
+
+def reconcile_held_voice_output(
+    client: B1AuthorityClient,
+    job_id: str,
+    *,
+    abandon_after_seconds: int = 900,
+) -> dict[str, Any]:
+    UUID(job_id)
+    result = client.rpc(
+        "creator_reconcile_held_voice_output",
+        {
+            "p_job_id": job_id,
+            "p_abandon_after_seconds": abandon_after_seconds,
+        },
+    )
+    if not isinstance(result, dict):
+        raise B1WorkerError("VOICE_OUTPUT_RECONCILE_RESPONSE_INVALID")
+    return result
+
+
 def run_mock_voice_job(client: B1AuthorityClient, job_id: str) -> dict[str, Any]:
     UUID(job_id)
     current = client.get_voice_job(job_id)
@@ -87,33 +128,74 @@ def run_mock_voice_job(client: B1AuthorityClient, job_id: str) -> dict[str, Any]
     if not isinstance(capability, str) or len(capability) != 64:
         raise B1WorkerError("VOICE_CLAIM_RESPONSE_INVALID")
     job = claim["job"]
+
     wav_bytes = create_synthetic_b1_wav(job_id)
     output_sha256 = hashlib.sha256(wav_bytes).hexdigest()
     object_path = _voice_object_path(job, output_sha256)
+
+    # Persist an output hold before bytes exist. If upload or completion later fails,
+    # the reconciler has durable authority to retain or delete the exact object without
+    # guessing whether a response-loss completion committed.
+    hold = client.rpc(
+        "creator_hold_mock_voice_output",
+        {
+            "p_job_id": job_id,
+            "p_capability": capability,
+            "p_object_path": object_path,
+            "p_output_sha256": output_sha256,
+            "p_byte_length": len(wav_bytes),
+            "p_mime_type": "audio/wav",
+        },
+    )
+    if not isinstance(hold, dict):
+        raise B1WorkerError("VOICE_OUTPUT_HOLD_RESPONSE_INVALID")
+
     client.upload_voice_object(
         object_path,
         wav_bytes,
         {"sha256": output_sha256, "job_id": job_id},
     )
+
     completion_key = str(uuid5(NAMESPACE_URL, f"avala-creator-b1-completion:{job_id}"))
-    completion = client.rpc(
-        "creator_complete_mock_voice_job",
-        {
-            "p_job_id": job_id,
-            "p_capability": capability,
-            "p_idempotency_key": completion_key,
-            "p_object_path": object_path,
-            "p_output_sha256": output_sha256,
-            "p_byte_length": len(wav_bytes),
-            "p_mime_type": "audio/wav",
-            "p_duration_ms": 1000,
-            "p_runtime_ms": 0,
-            "p_actual_cost_microunits": 0,
-            "p_synthetic_label": SYNTHETIC_LABEL,
-        },
-    )
+    try:
+        completion = client.rpc(
+            "creator_complete_mock_voice_job",
+            {
+                "p_job_id": job_id,
+                "p_capability": capability,
+                "p_idempotency_key": completion_key,
+                "p_object_path": object_path,
+                "p_output_sha256": output_sha256,
+                "p_byte_length": len(wav_bytes),
+                "p_mime_type": "audio/wav",
+                "p_duration_ms": 1000,
+                "p_runtime_ms": 0,
+                "p_actual_cost_microunits": 0,
+                "p_synthetic_label": SYNTHETIC_LABEL,
+            },
+        )
+    except B1WorkerError:
+        recovered = _committed_completion(client, job_id, output_sha256, object_path)
+        if recovered is not None:
+            return recovered
+        # Conservative cleanup: this queues only objects the database can prove are
+        # abandoned. A recoverable lease/response-loss state is deferred.
+        try:
+            reconcile_held_voice_output(client, job_id)
+        except B1WorkerError:
+            pass
+        raise
+
     if not isinstance(completion, dict) or not isinstance(completion.get("artifact"), dict):
+        recovered = _committed_completion(client, job_id, output_sha256, object_path)
+        if recovered is not None:
+            return recovered
+        try:
+            reconcile_held_voice_output(client, job_id)
+        except B1WorkerError:
+            pass
         raise B1WorkerError("VOICE_COMPLETION_RESPONSE_INVALID")
+
     return {
         "status": "succeeded",
         "job_id": job_id,

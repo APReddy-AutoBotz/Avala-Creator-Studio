@@ -38,10 +38,10 @@ export async function POST(request: Request, context: RouteContext) {
     if (!parsed.success) throw new CreatorHttpError(400, 'VALIDATION_FAILED', 'Voice request details are invalid.');
 
     const { client } = await requireCreatorAuthority();
-    const project = await readOwnedProject(client, projectId);
-    if (project.currentStage !== 'SCRIPT_APPROVED') {
-      throw new CreatorHttpError(409, 'SCRIPT_APPROVAL_REQUIRED', 'The current script must be approved first.');
-    }
+    // Project existence is checked here for a clear 404, but stage/idempotency authority
+    // belongs to the RPC. This lets an exact response-loss retry reach the recorded
+    // idempotent result even after the first request moved the project forward.
+    await readOwnedProject(client, projectId);
 
     const script = await readLatestScript(client, projectId);
     if (!script) throw new CreatorHttpError(409, 'SCRIPT_APPROVAL_REQUIRED', 'An approved script is required.');

@@ -29,7 +29,7 @@ export function VoiceReview({
       const body = await response.json();
       if (!response.ok || typeof body.url !== 'string') throw new Error(body.error ?? 'Preview is not available.');
       setPreviewUrl(body.url);
-      setMessage('Private preview opened for 60 seconds.');
+      setMessage('Authenticated private preview ready. Consent is rechecked when audio bytes are requested.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Preview failed.');
     } finally {
@@ -80,9 +80,17 @@ export function VoiceReview({
 
     <div className="voiceAudioPanel">
       {previewUrl
-        ? <audio controls preload="none" src={previewUrl} />
-        : <p className="hint">Audio stays private until you request a short-lived preview.</p>}
-      <button className="secondary" onClick={loadPreview} disabled={busy || Boolean(artifact.staleAt)}>Load 60-second preview</button>
+        ? <audio
+            controls
+            preload="none"
+            src={previewUrl}
+            onError={() => {
+              setPreviewUrl(null);
+              setMessage('Preview authority changed or the audio is no longer available. Reload the preview to recheck consent.');
+            }}
+          />
+        : <p className="hint">Audio stays private. Each preview request is authenticated and rechecks current consent.</p>}
+      <button className="secondary" onClick={loadPreview} disabled={busy || Boolean(artifact.staleAt)}>Load authenticated preview</button>
     </div>
 
     <div className="evidenceGrid">

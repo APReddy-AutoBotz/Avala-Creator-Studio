@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 
 const foundation = readFileSync(new URL('../migrations/20260813164153_m3b1_voice_output_foundation.sql', import.meta.url), 'utf8');
 const deletionIndex = readFileSync(new URL('../migrations/20260813165624_m3b1_media_deletion_owner_status_index.sql', import.meta.url), 'utf8');
-const requestStage = readFileSync(new URL('../migrations/20260813165000_m3b1_voice_request_stage.sql', import.meta.url), 'utf8');
-const claim = readFileSync(new URL('../migrations/20260813165001_m3b1_voice_claim_capability.sql', import.meta.url), 'utf8');
-const completion = readFileSync(new URL('../migrations/20260813165002_m3b1_voice_completion.sql', import.meta.url), 'utf8');
-const reviewRetention = readFileSync(new URL('../migrations/20260813165003_m3b1_voice_review_and_retention.sql', import.meta.url), 'utf8');
+const requestStage = readFileSync(new URL('../migrations/20260814013818_m3b1_voice_request_stage.sql', import.meta.url), 'utf8');
+const claim = readFileSync(new URL('../migrations/20260814013846_m3b1_voice_claim_capability.sql', import.meta.url), 'utf8');
+const completion = readFileSync(new URL('../migrations/20260814013923_m3b1_voice_completion.sql', import.meta.url), 'utf8');
+const reviewRetention = readFileSync(new URL('../migrations/20260814013959_m3b1_voice_review_and_retention.sql', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../../packages/contracts/src/workflow.ts', import.meta.url), 'utf8');
 const runtimeContracts = readFileSync(new URL('../../packages/contracts/src/voice-runtime.ts', import.meta.url), 'utf8');
 const workerVoice = readFileSync(new URL('../../services/render-worker/src/creator_worker/voice.py', import.meta.url), 'utf8');

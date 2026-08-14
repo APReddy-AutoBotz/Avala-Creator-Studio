@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const hardening = readFileSync(
-  new URL('../migrations/20260814010000_m3b1_authority_concurrency_hardening.sql', import.meta.url),
+  new URL('../migrations/20260814014204_m3b1_authority_concurrency_hardening.sql', import.meta.url),
   'utf8',
 );
 

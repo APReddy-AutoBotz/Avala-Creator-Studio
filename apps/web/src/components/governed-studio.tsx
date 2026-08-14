@@ -51,10 +51,7 @@ export function GovernedStudio() {
   }
 
   async function loadState(id = projectId) {
-    if (!id) {
-      setState(null);
-      return;
-    }
+    if (!id) return;
     const response = await fetch(`/api/creator/projects/${id}/voice`, { cache: 'no-store' });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? 'Could not load voice stage.');
@@ -77,10 +74,7 @@ export function GovernedStudio() {
   }, []);
 
   useEffect(() => {
-    if (!projectId) {
-      setState(null);
-      return;
-    }
+    if (!projectId) return;
     loadState(projectId).catch(error => setMessage(error instanceof Error ? error.message : 'Voice stage load failed.'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);

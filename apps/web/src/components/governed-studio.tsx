@@ -54,10 +54,10 @@ export function GovernedStudio() {
       const firstEligible = nextProfiles.find(eligibleVoiceProfile);
       if (firstEligible) setProfileId(firstEligible.id);
     }
-    if (!projectId && nextProjects.length) {
-      const initialProjectId = nextProjects[0].id;
-      setProjectId(initialProjectId);
-      await loadState(initialProjectId);
+    const initialProject = nextProjects[0];
+    if (!projectId && initialProject) {
+      setProjectId(initialProject.id);
+      await loadState(initialProject.id);
     }
   }
 

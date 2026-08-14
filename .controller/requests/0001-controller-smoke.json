@@ -1,0 +1,1 @@
+{"version":1,"base_sha":"bd6ef451cc672ea458f58d3b9b9a2178e41a6ed4","commit_message":"test: verify cloud controller source write","files":[{"path":"packages/contracts/src/b1-marker.ts","content_base64":"ZXhwb3J0IGNvbnN0IEIxX01BUktFUiA9IHRydWU7Cg=="}],"deletions":[]}

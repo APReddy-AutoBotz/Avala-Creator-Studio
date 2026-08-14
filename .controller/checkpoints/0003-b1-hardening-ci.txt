@@ -1,0 +1,1 @@
+M3 B1 authority hardening checkpoint. Trigger owner-authored CI after controller materialization.

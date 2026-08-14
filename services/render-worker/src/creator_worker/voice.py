@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import io
 import json
+import math
+import struct
 from typing import Literal, Protocol
+import wave
 
 ProviderApprovalState = Literal["research_only", "approved_for_test", "approved_for_runtime", "disabled"]
 ProfileStatus = Literal["draft", "active", "revoked", "deleting", "deleted"]
@@ -47,6 +51,16 @@ class MockVoiceDraft:
     job_id: str
     descriptor_sha256: str
     media_created: bool
+
+
+@dataclass(frozen=True)
+class SyntheticWavFixture:
+    label: str
+    mime_type: str
+    duration_ms: int
+    byte_length: int
+    sha256: str
+    audio_bytes: bytes
 
 
 class VoiceProviderAdapter(Protocol):
@@ -109,3 +123,39 @@ class DeterministicMockVoiceAdapter:
             descriptor_sha256=digest,
             media_created=False,
         )
+
+
+def create_synthetic_wav_fixture(*, job_id: str, duration_ms: int = 800) -> SyntheticWavFixture:
+    """Create deterministic non-speech WAV bytes for governed review-path testing."""
+    if not job_id or len(job_id) > 128:
+        raise VoiceExecutionBlocked("VOICE_JOB_ID_INVALID")
+    if duration_ms < 100 or duration_ms > 5_000:
+        raise VoiceExecutionBlocked("VOICE_FIXTURE_DURATION_INVALID")
+
+    sample_rate = 16_000
+    frame_count = sample_rate * duration_ms // 1_000
+    seed = hashlib.sha256(job_id.encode("utf-8")).digest()
+    frequency = 240 + int.from_bytes(seed[:2], "big") % 240
+    amplitude = 3_200
+
+    pcm = bytearray()
+    for frame in range(frame_count):
+        value = int(amplitude * math.sin(2 * math.pi * frequency * frame / sample_rate))
+        pcm.extend(struct.pack("<h", value))
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(bytes(pcm))
+
+    audio = buffer.getvalue()
+    return SyntheticWavFixture(
+        label=SYNTHETIC_VOICE_LABEL,
+        mime_type="audio/wav",
+        duration_ms=duration_ms,
+        byte_length=len(audio),
+        sha256=hashlib.sha256(audio).hexdigest(),
+        audio_bytes=audio,
+    )

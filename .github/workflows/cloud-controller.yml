@@ -1,0 +1,159 @@
+name: Cloud Controller
+
+on:
+  push:
+    branches:
+      - milestone/m3b1-voice-runtime-readiness
+    paths:
+      - '.controller/requests/*.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: creator-studio-cloud-controller
+  cancel-in-progress: false
+
+jobs:
+  apply-request:
+    if: github.actor == 'APReddy-AutoBotz'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Locate controller request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          request="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^\.controller/requests/[A-Za-z0-9._-]+\.json$' | tail -n 1)"
+          test -n "$request"
+          echo "path=$request" >> "$GITHUB_OUTPUT"
+
+      - name: Validate and materialize request
+        env:
+          REQUEST_PATH: ${{ steps.request.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import io
+          import json
+          import os
+          import pathlib
+          import re
+          import subprocess
+          import tarfile
+
+          request_path = pathlib.Path(os.environ['REQUEST_PATH'])
+          data = json.loads(request_path.read_text(encoding='utf-8'))
+          if data.get('version') != 1:
+              raise SystemExit('unsupported controller request version')
+
+          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
+          if data.get('base_sha') != parent:
+              raise SystemExit('controller request base SHA mismatch')
+
+          message = data.get('commit_message')
+          if not isinstance(message, str) or not re.fullmatch(r'[A-Za-z0-9 ._():/\-]{1,100}', message):
+              raise SystemExit('invalid controller commit message')
+
+          files = data.get('files', [])
+          archive = data.get('archive_base64')
+          deletions = data.get('deletions', [])
+          if not isinstance(files, list) or len(files) > 50:
+              raise SystemExit('invalid file list')
+          if archive is not None and (not isinstance(archive, str) or len(archive) > 1_000_000):
+              raise SystemExit('invalid archive payload')
+          if not files and archive is None:
+              raise SystemExit('controller request has no materialized files')
+          if not isinstance(deletions, list) or len(deletions) > 50:
+              raise SystemExit('invalid deletion list')
+
+          allowed = re.compile(r'^(apps/web/|packages/contracts/|services/render-worker/|supabase/migrations/|supabase/tests/|docs/|tasks/|package\.json$|pnpm-workspace\.yaml$)')
+          forbidden_media = re.compile(r'\.(wav|mp3|m4a|mp4|mov|webm|png|jpg|jpeg|webp)$', re.I)
+
+          def validate_path(path: str) -> None:
+              pure = pathlib.PurePosixPath(path)
+              if not allowed.match(path) or path.startswith('/') or '..' in pure.parts or forbidden_media.search(path):
+                  raise SystemExit(f'forbidden controller path: {path!r}')
+
+          changed: list[str] = []
+          for item in files:
+              if not isinstance(item, dict) or set(item) != {'path', 'content_base64'}:
+                  raise SystemExit('invalid file entry')
+              path = item['path']
+              if not isinstance(path, str):
+                  raise SystemExit('invalid controller path')
+              validate_path(path)
+              encoded = item['content_base64']
+              if not isinstance(encoded, str) or len(encoded) > 1_000_000:
+                  raise SystemExit('invalid file payload')
+              raw = base64.b64decode(encoded, validate=True)
+              if len(raw) > 700_000:
+                  raise SystemExit('file payload too large')
+              raw.decode('utf-8')
+              target = pathlib.Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+              changed.append(path)
+
+          if archive is not None:
+              archive_bytes = base64.b64decode(archive, validate=True)
+              if len(archive_bytes) > 700_000:
+                  raise SystemExit('archive payload too large')
+              with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode='r:gz') as bundle:
+                  members = bundle.getmembers()
+                  if not members or len(members) > 50:
+                      raise SystemExit('archive must contain 1-50 entries')
+                  for member in members:
+                      if member.isdir():
+                          continue
+                      if not member.isfile():
+                          raise SystemExit('archive may contain regular files and directories only')
+                      validate_path(member.name)
+                      if member.size > 700_000:
+                          raise SystemExit('archive member too large')
+                      source = bundle.extractfile(member)
+                      if source is None:
+                          raise SystemExit('archive member unavailable')
+                      raw = source.read()
+                      raw.decode('utf-8')
+                      target = pathlib.Path(member.name)
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(raw)
+                      changed.append(member.name)
+
+          for path in deletions:
+              if not isinstance(path, str):
+                  raise SystemExit('invalid deletion path')
+              validate_path(path)
+              target = pathlib.Path(path)
+              if target.exists():
+                  target.unlink()
+              changed.append(path)
+
+          if len(changed) != len(set(changed)):
+              raise SystemExit('duplicate controller target')
+          if not changed:
+              raise SystemExit('controller request produced no file changes')
+          pathlib.Path('.controller-changed.txt').write_text('\n'.join(changed) + '\n', encoding='utf-8')
+          pathlib.Path('.controller-message.txt').write_text(message + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit validated source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            git add -A -- "$path"
+          done < .controller-changed.txt
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git config user.name 'creator-studio-controller[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -F .controller-message.txt
+          git push origin "HEAD:${GITHUB_REF_NAME}"

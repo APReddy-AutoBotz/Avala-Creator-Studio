@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server';
 import { CreateProjectInputSchema } from '@creator/contracts';
-import { CreatorHttpError, creatorErrorResponse, readJsonBody, requireCreatorAuthority, serializeProject, throwForRpcError } from '../../../../lib/server/authority';
+import {
+  CreatorHttpError,
+  creatorErrorResponse,
+  readJsonBody,
+  requireCreatorAuthority,
+  serializeProject,
+  throwForRpcError,
+} from '../../../../lib/server/authority';
+
+export async function GET() {
+  try {
+    const { client } = await requireCreatorAuthority();
+    const { data, error } = await client
+      .from('creator_projects')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    throwForRpcError(error);
+    return NextResponse.json({ projects: (data ?? []).map(serializeProject) });
+  } catch (error) {
+    return creatorErrorResponse(error);
+  }
+}
 
 export async function POST(request: Request) {
   try {

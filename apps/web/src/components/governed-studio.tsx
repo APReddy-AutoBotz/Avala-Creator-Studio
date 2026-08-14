@@ -31,6 +31,13 @@ export function GovernedStudio() {
   const voiceProfiles = useMemo(() => profiles.filter(eligibleVoiceProfile), [profiles]);
   const selectedProject = projects.find(project => project.id === projectId) ?? state?.project ?? null;
 
+  async function loadState(id: string) {
+    const response = await fetch(`/api/creator/projects/${id}/voice`, { cache: 'no-store' });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? 'Could not load voice stage.');
+    setState(body as VoiceState);
+  }
+
   async function loadWorkspace() {
     const [projectResponse, profileResponse] = await Promise.all([
       fetch('/api/creator/projects', { cache: 'no-store' }),
@@ -43,19 +50,15 @@ export function GovernedStudio() {
     const nextProfiles = Array.isArray(profileBody.profiles) ? profileBody.profiles as ProfileWithSamples[] : [];
     setProjects(nextProjects);
     setProfiles(nextProfiles);
-    if (!projectId && nextProjects.length) setProjectId(nextProjects[0].id);
     if (!profileId) {
       const firstEligible = nextProfiles.find(eligibleVoiceProfile);
       if (firstEligible) setProfileId(firstEligible.id);
     }
-  }
-
-  async function loadState(id = projectId) {
-    if (!id) return;
-    const response = await fetch(`/api/creator/projects/${id}/voice`, { cache: 'no-store' });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? 'Could not load voice stage.');
-    setState(body as VoiceState);
+    if (!projectId && nextProjects.length) {
+      const initialProjectId = nextProjects[0].id;
+      setProjectId(initialProjectId);
+      await loadState(initialProjectId);
+    }
   }
 
   useEffect(() => {
@@ -69,18 +72,27 @@ export function GovernedStudio() {
       }
     })();
     return () => { active = false; };
-  // Initial authority discovery only. Project selection has its own effect below.
+  // Initial authority discovery only; later state loads are explicit user actions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!projectId) return;
-    loadState(projectId).catch(error => setMessage(error instanceof Error ? error.message : 'Voice stage load failed.'));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  async function changeProject(id: string) {
+    setProjectId(id);
+    if (!id) {
+      setState(null);
+      return;
+    }
+    try {
+      await loadState(id);
+      setMessage('Governed project state loaded.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Voice stage load failed.');
+    }
+  }
 
   async function refresh() {
-    await Promise.all([loadWorkspace(), loadState()]);
+    await loadWorkspace();
+    if (projectId) await loadState(projectId);
   }
 
   async function createProject() {
@@ -97,6 +109,7 @@ export function GovernedStudio() {
       if (!response.ok) throw new Error(body.error ?? 'Project creation failed.');
       await loadWorkspace();
       setProjectId(body.project.id);
+      await loadState(body.project.id);
       setMessage('Project created. Complete governed content and script approval before requesting voice.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Project creation failed.');
@@ -119,7 +132,7 @@ export function GovernedStudio() {
       setMessage(body.replayed
         ? 'Voice request already exists.'
         : 'Synthetic voice draft requested. Trusted worker completion is the next gate.');
-      await loadState();
+      await loadState(projectId);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Voice request failed.');
     } finally {
@@ -143,13 +156,13 @@ export function GovernedStudio() {
 
     <section className="governedToolbar">
       <label>Project
-        <select value={projectId} onChange={event => setProjectId(event.target.value)}>
+        <select value={projectId} onChange={event => void changeProject(event.target.value)}>
           <option value="">Select project</option>
           {projects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}
         </select>
       </label>
       <button className="secondary" onClick={createProject} disabled={busy}>New project</button>
-      <button className="secondary" onClick={() => refresh()} disabled={busy || !projectId}>Refresh</button>
+      <button className="secondary" onClick={() => void refresh()} disabled={busy || !projectId}>Refresh</button>
     </section>
 
     <section className="governedWorkspace">

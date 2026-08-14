@@ -13,6 +13,10 @@ const closure = readFileSync(
   new URL('../migrations/20260814042219_m3b1_codex_review_closure.sql', import.meta.url),
   'utf8',
 );
+const advisorClosure = readFileSync(
+  new URL('../migrations/20260814045951_m3b1_authenticated_gateway_advisor_closure.sql', import.meta.url),
+  'utf8',
+);
 const requestRoute = readFileSync(
   new URL('../../apps/web/src/app/api/creator/projects/[projectId]/voice/request/route.ts', import.meta.url),
   'utf8',
@@ -99,11 +103,11 @@ assert.match(
 assert.match(
   pgcryptoFix,
   /creator_claim_media_deletion_impl\(uuid,integer\)[\s\S]*search_path\s*=\s*'extensions'/is,
-  'media deletion capability entropy must resolve from the trusted extensions schema',
+ 'media deletion capability entropy must resolve from the trusted extensions schema',
 );
 assert.doesNotMatch(
   pgcryptoFix,
-  /search_path\s*=\s*'public'/is,
+   /search_path\s*=\s*'public'/is,
   'capability-generating security-definer functions must not trust the public schema',
 );
 
@@ -139,19 +143,42 @@ assert.match(
 );
 
 for (const fn of [
-  'creator_request_voice_job',
   'creator_claim_mock_voice_job_b1',
   'creator_complete_mock_voice_job',
-  'creator_request_voice_revision',
   'creator_claim_media_deletion',
   'creator_finish_media_deletion',
 ]) {
   assert.match(
     closure,
     new RegExp(`create or replace function public\\.${fn}\\([\\s\\S]*?security definer`, 'i'),
-    `${fn} public gateway must be security definer while private implementation stays hidden`,
+    `${fn} worker gateway must remain service-role hardened`,
   );
 }
+assert.match(
+  advisorClosure,
+  /alter function public\.creator_request_voice_job\([^;]+\) security invoker/is,
+  'human voice request gateway must be security invoker',
+);
+assert.match(
+  advisorClosure,
+  /alter function public\.creator_request_voice_revision\([^;]+\) security invoker/is,
+  'human voice revision gateway must be security invoker',
+);
+assert.match(
+  advisorClosure,
+  /grant execute on function creator_private\.creator_request_voice_job_b1_impl\([^;]+\) to authenticated/is,
+  'authenticated request gateway must have only the exact private implementation grant it requires',
+);
+assert.match(
+  advisorClosure,
+  /grant execute on function creator_private\.creator_request_voice_revision_impl\([^;]+\) to authenticated/is,
+  'authenticated revision gateway must have only the exact private implementation grant it requires',
+);
+assert.doesNotMatch(
+  advisorClosure,
+  /grant execute on (all functions|function creator_private\.(?!creator_request_voice_job_b1_impl|creator_request_voice_revision_impl))/is,
+  'advisor closure must not broaden authenticated execution across private functions',
+);
 assert.match(
   closure,
   /creator_hold_mock_voice_output_impl[\s\S]*status='held'|['"]held['"]/is,
@@ -191,7 +218,7 @@ assert.match(
 assert.doesNotMatch(
   workerRuntime,
   /\b(import|from)\s+(chatterbox|qwen|cosyvoice|openvoice|torch|transformers|huggingface_hub)\b/i,
-  'B1 closure must not import real TTS runtime packages',
+ 'B1 closure must not import real TTS runtime packages',
 );
 
 console.log('M3 B1 concurrency and Codex review closure guardrails: PASS');

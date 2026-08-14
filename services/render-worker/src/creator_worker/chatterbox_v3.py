@@ -107,14 +107,13 @@ def runtime_policy_from_environment(env: Mapping[str, str] | None = None) -> Run
         raise ChatterboxReadinessError("REAL_VOICE_BUDGET_INVALID") from error
     if budget < 0:
         raise ChatterboxReadinessError("REAL_VOICE_BUDGET_INVALID")
-    cache_dir = values.get("CREATOR_CHATTERBOX_MODEL_CACHE") or None
     return RuntimePolicy(
         adapter_enabled=_env_bool(values, "CREATOR_CHATTERBOX_ADAPTER_ENABLED"),
         inference_approved=_env_bool(values, "CREATOR_REAL_INFERENCE_APPROVED"),
         supply_chain_approved=_env_bool(values, "CREATOR_CHATTERBOX_SUPPLY_CHAIN_APPROVED"),
         network_download_allowed=_env_bool(values, "CREATOR_MODEL_NETWORK_DOWNLOAD_ALLOWED"),
         max_job_cost_microunits=budget,
-        model_cache_dir=cache_dir,
+        model_cache_dir=values.get("CREATOR_CHATTERBOX_MODEL_CACHE") or None,
     )
 
 
@@ -125,6 +124,7 @@ def _valid_sha256(value: str | None) -> bool:
 def validate_manifest(
     manifest: ModelManifest,
     *,
+    cache_dir: str | None = None,
     verify_local_files: bool = False,
 ) -> tuple[str, ...]:
     blockers: list[str] = []
@@ -135,7 +135,6 @@ def validate_manifest(
     if manifest.perth_commit != PERTH_PIN_CANDIDATE:
         blockers.append("PERTH_IMMUTABLE_PIN_REQUIRED")
 
-    cache_dir = os.getenv("CREATOR_CHATTERBOX_MODEL_CACHE")
     for asset in manifest.assets:
         if asset.required and not _valid_sha256(asset.sha256):
             blockers.append(f"MODEL_ASSET_DIGEST_REQUIRED:{asset.name}")
@@ -172,7 +171,11 @@ class ChatterboxV3Provider:
     ) -> PreflightResult:
         manifest = default_manifest() if manifest is None else manifest
         policy = runtime_policy_from_environment() if policy is None else policy
-        blockers = list(validate_manifest(manifest, verify_local_files=verify_local_files))
+        blockers = list(validate_manifest(
+            manifest,
+            cache_dir=policy.model_cache_dir,
+            verify_local_files=verify_local_files,
+        ))
 
         normalized_language = language.strip().lower()
         if normalized_language not in SUPPORTED_LANGUAGES:
@@ -192,7 +195,6 @@ class ChatterboxV3Provider:
         if not policy.inference_approved:
             blockers.append("REAL_INFERENCE_APPROVAL_REQUIRED")
 
-        # B2 has a code-level stop even if all external flags are accidentally enabled.
         blockers.append("REAL_INFERENCE_NOT_APPROVED_B2")
         unique = tuple(dict.fromkeys(blockers))
         structural_blockers = tuple(
@@ -210,12 +212,10 @@ class ChatterboxV3Provider:
         )
 
     def _load_runtime_class(self):
-        # This is the only optional runtime import point and is unreachable in B2 execution.
         module = importlib.import_module("chatterbox.mtl_tts")
         return module.ChatterboxMultilingualTTS
 
     def generate(self, **_: object) -> None:
-        # Do not move this gate below any import/cache/model operation.
         if B2_EXECUTION_PERMANENTLY_DISABLED:
             raise ChatterboxReadinessError("REAL_INFERENCE_NOT_APPROVED_B2")
         self._load_runtime_class()

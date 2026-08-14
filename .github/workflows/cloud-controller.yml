@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - milestone/m3b1-voice-runtime-readiness
+      - milestone/m3b2a-real-voice-readiness
     paths:
       - '.controller/requests/*.json'
 
@@ -73,7 +74,7 @@ jobs:
           if not isinstance(deletions, list) or len(deletions) > 50:
               raise SystemExit('invalid deletion list')
 
-          allowed = re.compile(r'^(apps/web/|packages/contracts/|services/render-worker/|supabase/migrations/|supabase/tests/|docs/|tasks/|package\.json$|pnpm-workspace\.yaml$)')
+          allowed = re.compile(r'^(apps/web/|packages/contracts/|services/render-worker/|supabase/migrations/|supabase/tests/|config/providers/|deploy/|docs/|tasks/|package\.json$|pnpm-workspace\.yaml$)')
           forbidden_media = re.compile(r'\.(wav|mp3|m4a|mp4|mov|webm|png|jpg|jpeg|webp)$', re.I)
 
           def validate_path(path: str) -> None:

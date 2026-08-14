@@ -148,7 +148,7 @@ for (const fn of [
 ]) {
   assert.match(
     closure,
-    new RegExp(`create or replace function public\\\\.${fn}\\\\([\\\\s\\\\S]*?security definer`, 'i'),
+    new RegExp(`create or replace function public\\.${fn}\\([\\s\\S]*?security definer`, 'i'),
     `${fn} public gateway must be security definer while private implementation stays hidden`,
   );
 }

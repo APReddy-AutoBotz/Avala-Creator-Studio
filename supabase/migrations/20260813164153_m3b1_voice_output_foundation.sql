@@ -47,9 +47,6 @@ create policy creator_media_deletions_owner_select on public.creator_media_delet
 revoke all on table public.creator_media_deletions from anon,authenticated;
 grant select on table public.creator_media_deletions to authenticated;
 
-create index creator_media_deletions_owner_status_idx
-  on public.creator_media_deletions(owner_id,status,requested_at);
-
 create policy creator_voice_output_owner_select on storage.objects
   for select to authenticated
   using (

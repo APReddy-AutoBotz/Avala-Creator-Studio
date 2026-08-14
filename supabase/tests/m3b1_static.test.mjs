@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const foundation = readFileSync(new URL('../migrations/20260813164153_m3b1_voice_output_foundation.sql', import.meta.url), 'utf8');
+const deletionIndex = readFileSync(new URL('../migrations/20260813165624_m3b1_media_deletion_owner_status_index.sql', import.meta.url), 'utf8');
 const requestStage = readFileSync(new URL('../migrations/20260813165000_m3b1_voice_request_stage.sql', import.meta.url), 'utf8');
 const claim = readFileSync(new URL('../migrations/20260813165001_m3b1_voice_claim_capability.sql', import.meta.url), 'utf8');
 const completion = readFileSync(new URL('../migrations/20260813165002_m3b1_voice_completion.sql', import.meta.url), 'utf8');
@@ -16,6 +17,8 @@ assert.match(foundation,/creator_voice_output_owner_select/is,'private voice out
 assert.match(foundation,/a\.stale_at is null/is,'stale audio must not remain preview-authoritative');
 assert.doesNotMatch(foundation,/for insert to authenticated[\s\S]*creator-voice-output/is,'browser must not upload voice output');
 assert.doesNotMatch(foundation,/delete from storage\.objects/is,'SQL must not bypass the Storage API');
+assert.doesNotMatch(foundation,/create index creator_media_deletions_owner_status_idx/is,'foundation history must match the applied live migration');
+assert.match(deletionIndex,/create index creator_media_deletions_owner_status_idx[\s\S]*creator_media_deletions\(owner_id,status,requested_at\)/is,'deletion index must be tracked as its own live migration');
 
 assert.match(requestStage,/creator_request_voice_job_impl/is,'B1 must retain Phase A request authority');
 assert.match(requestStage,/current_stage='VOICE_GENERATING'/is,'accepted mock request must enter VOICE_GENERATING');
@@ -54,7 +57,7 @@ assert.match(reviewRetention,/current_stage='SCRIPT_APPROVED'/is,'voice revision
 assert.match(reviewRetention,/PRIVATE_MEDIA_DELETE_REQUIRED/is,'deletion completion must prove Storage deletion happened');
 assert.doesNotMatch(reviewRetention,/delete from storage\.objects/is,'deletion worker SQL must not bypass Storage API');
 
-assert.match(workflow,/VOICE_REVIEW', event: 'APPROVE_VOICE', to: 'VOICE_APPROVED', actor: 'human'/is,'voice approval remains human-only');
+assert.match(workflow,/from:\s*'VOICE_REVIEW'\s*,\s*event:\s*'APPROVE_VOICE'\s*,\s*to:\s*'VOICE_APPROVED'\s*,\s*actor:\s*'human'/is,'voice approval remains human-only');
 assert.match(runtimeContracts,/SYNTHETIC MOCK VOICE DRAFT/,'B1 contracts require visible synthetic labelling');
 assert.match(runtimeContracts,/actualCostMicrounits: z\.literal\(0\)/,'B1 completion contract requires zero cost');
 assert.match(workerVoice,/create_synthetic_wav_fixture/is,'worker must provide a deterministic synthetic WAV test fixture');

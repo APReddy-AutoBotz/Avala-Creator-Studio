@@ -5,6 +5,10 @@ const hardening = readFileSync(
   new URL('../migrations/20260814014204_m3b1_authority_concurrency_hardening.sql', import.meta.url),
   'utf8',
 );
+const pgcryptoFix = readFileSync(
+  new URL('../migrations/20260814014815_m3b1_pgcrypto_capability_search_path.sql', import.meta.url),
+  'utf8',
+);
 
 assert.match(
   hardening,
@@ -70,6 +74,21 @@ assert.doesNotMatch(
   hardening,
   /approved_for_runtime|real_provider_execution_enabled\s*=\s*true/is,
   'B1 hardening must not enable real-provider execution',
+);
+assert.match(
+  pgcryptoFix,
+  /creator_claim_mock_voice_job_b1_impl\(uuid,integer\)[\s\S]*search_path\s*=\s*'extensions'/is,
+  'voice lease capability entropy must resolve from the trusted extensions schema',
+);
+assert.match(
+  pgcryptoFix,
+  /creator_claim_media_deletion_impl\(uuid,integer\)[\s\S]*search_path\s*=\s*'extensions'/is,
+  'media deletion capability entropy must resolve from the trusted extensions schema',
+);
+assert.doesNotMatch(
+  pgcryptoFix,
+  /search_path\s*=\s*'public'/is,
+  'capability-generating security-definer functions must not trust the public schema',
 );
 
 console.log('M3 B1 concurrency hardening guardrails: PASS');

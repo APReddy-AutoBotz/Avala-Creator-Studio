@@ -1,0 +1,32 @@
+# B2 readiness image only. This image MUST NOT install Chatterbox, Torch, model weights, or invoke inference.
+# B3 will replace/pin the runtime base only after supply-chain, GPU-cost and model-cache approval.
+ARG BASE_IMAGE=python:3.12-slim
+FROM ${BASE_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CREATOR_RUNTIME_MODE=preview \
+    CREATOR_PROVIDER_MODE=real \
+    CREATOR_CHATTERBOX_ADAPTER_ENABLED=false \
+    CREATOR_REAL_INFERENCE_APPROVED=false \
+    CREATOR_CHATTERBOX_SUPPLY_CHAIN_APPROVED=false \
+    CREATOR_MODEL_NETWORK_DOWNLOAD_ALLOWED=false \
+    CREATOR_REAL_VOICE_MAX_JOB_COST_MICROUNITS=0 \
+    CREATOR_CHATTERBOX_MODEL_CACHE=/models/chatterbox
+
+WORKDIR /app
+
+COPY pyproject.toml /app/pyproject.toml
+COPY src /app/src
+
+# Install the lightweight Creator worker only. Do not add the real-provider package in B2.
+RUN python -m pip install --no-cache-dir . \
+    && addgroup --system creator \
+    && adduser --system --ingroup creator --home /nonexistent --no-create-home creator \
+    && mkdir -p /models/chatterbox \
+    && chown -R creator:creator /app /models/chatterbox
+
+USER creator
+
+EXPOSE 8090
+CMD ["uvicorn", "creator_worker.main:app", "--host", "0.0.0.0", "--port", "8090"]

@@ -34,7 +34,7 @@ assert.doesNotMatch(dockerfile, /pip install[^\n]*(?:chatterbox|torch)|snapshot_
 
 assert.match(phaseA, /real_provider_execution_enabled boolean[\s\S]*check \(real_provider_execution_enabled = false\)/i,
   'database policy must structurally forbid real-provider execution');
-assert.match(phaseAConstraints, /provider_id = 'mock'[\s\S]*approval_state = 'research_only'[\s\S]*install_state = 'not_installed'[\s\S]*execution_enabled = false/is,
+assert.match(phaseA, /provider_id = 'mock'[\s\S]*approval_state = 'research_only'[\s\S]*install_state = 'not_installed'[\s\S]*execution_enabled = false/is,
   'non-mock providers must remain research-only/not-installed/disabled');
 assert.doesNotMatch(phaseA + phaseAConstraints, /real_provider_execution_enabled\s*=\s*true/i);
 
